@@ -11,7 +11,7 @@ We will do this using **branches** — essentially different “versions” of t
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/USERNAME/LION-BO.git #Copies the repository over from GitHub
+   git clone https://github.com/CCDyson/LION-BO.git #Copies the repository over from GitHub
    cd LION-BO #Enter the repository
    ```
 
