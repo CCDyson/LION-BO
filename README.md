@@ -8,7 +8,9 @@ We will do this using **branches** — essentially different “versions” of t
 
 ## Getting Started
 
-1. **Clone the repository:**
+1. **Enter your work directory**
+
+2. **Clone the repository:**
 
    ```bash
    git clone https://github.com/CCDyson/LION-BO.git #Copies the repository over from GitHub
@@ -38,6 +40,7 @@ git checkout -b your-branch-name #Enters the branch
 ### 3. Make changes to the code
 
 Edit, test, etc.
+(When running the code I would run from your workspace, not the LION-BO folder.)
 
 ---
 
