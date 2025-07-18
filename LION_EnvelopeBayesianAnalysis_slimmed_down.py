@@ -19,6 +19,7 @@ import LION_EnvOptimisation as EO
 import BeamLineElement      as BLE
 import UserFramework        as UsrFw
 import pickle
+import matplotlib.pyplot as plt
 
 #This script is a rewording of the UserAnalysis.py script that you should have in your 03-Scripts folder
 # It will be what we run to optimise the beamline
@@ -163,9 +164,8 @@ def main(argv):
     
     # Collect some constants before running the optimisation
     experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
-    df_list = [pd.read_csv('RCF_DOSE_DATA/'+f) for f in experiment_files]
-    # combine data list
-    exp_data = pd.concat(df_list, ignore_index=True)
+    exp_data_layers = [pd.read_csv('RCF_DOSE_DATA/'+f).to_numpy() for f in experiment_files]
+    exp_data = np.stack(exp_data_layers, axis=-1) # shape (H, W, 7) 
 
     response_functions = []  # Initialize as list
     for stack in range(7):
@@ -177,6 +177,22 @@ def main(argv):
             
             
     # Note to self: Need to verify the way the response functions are loaded and employed
+    
+    # Define a kinetic energy range for testing (adjust as needed)
+    ke_test = np.linspace(0, 20, 500)  # energies from 0 to 20 MeV
+
+    plt.figure(figsize=(10, 6))
+
+    for i, response_func in enumerate(response_functions, start=1):
+        deposited_energy = response_func(ke_test)
+        plt.plot(ke_test, deposited_energy, label=f'Stack {i}')
+
+    plt.xlabel('Kinetic Energy (MeV)')
+    plt.ylabel('Deposited Energy (arb. units)')
+    plt.title('Response Functions for Each Stack Layer')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
     
         # This then runs the optimisation
     # The function to be minimised is the cost_function
