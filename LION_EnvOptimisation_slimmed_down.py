@@ -333,11 +333,38 @@ class UserAnal:
         Prtcl.Particle.cleanParticles()
 
 
-    def calculate_chi_squared(cls, response_funcs, exp_data, sim_data):
+    def calc_cost(cls, response_funcs, exp_data):
+        """
+        Calculate the cost (1 - normalized cross correlation) between simulated and experimental data.
+
+        This method is typically called in the main script to compute how well the simulated particle
+        transmission matches experimental measurements, expressed via a cost function suitable for minimization.
+
+        Steps:
+        - Retrieves all existing particle instances and their trace space through the beamline.
+        - Extracts particle end positions (x, y) and kinetic energies (ke) after the final beamline element.
+        - Uses provided response functions to convert kinetic energies to deposited energies in a detector stack.
+        - Builds histograms of deposited energies spatially.
+        - Compares simulated histograms with experimental histograms using normalized cross correlation (NCC).
+        - Computes cost as 1 - NCC, where lower cost indicates better agreement.
+
+        Parameters:
+        - response_funcs : list of callables
+            List of response functions for each detector layer. Each function maps kinetic energies to deposited energies.
+        - exp_data : np.ndarray
+            Experimental histogram data to compare against (shape should match histograms produced by `histo_data`).
+
+        Returns:
+        - cost : float
+            A scalar cost value representing the mismatch between simulation and experiment.
+            Returns 0 if no particles are available.
+
+        Notes:
+        - Assumes the particle mass for protons is retrieved internally.
+        - Assumes beamline consists of 9 elements, and trace space data length and shape are checked accordingly.
+        - Cleans particle instances from memory after processing.
+        """
         # This is the function called in the main script to calculate the transmission
-        # I left this in for reference. We will change it to be calculate chi squared
-        
-        # Set the threshold for the beam size at the end of the beamline
         
         pmass = PC.PhysicalConstants().getparticleMASS('Proton')  # MeV/c^2
         nEvts = len(Prtcl.Particle.getinstances())
@@ -370,141 +397,118 @@ class UserAnal:
                     x.append(x_end)
                     y.append(y_end)
                     ke.append(ke_end)
+                    
+            # Clean memory after saving particle
+            Prtcl.Particle.cleanParticles()
 
         histogram_counts = cls.histo_data(x, y, ke, response_funcs)
         
-        chi_squared_summed = cls.compare_histograms(histogram_counts, exp_data, sim_data)
+        cost = 1 - cls.NCC(histogram_counts, exp_data)
         
-        
-
         print('*************************************************************')
-        print(f"_________Total chi squared value_________: {chi_squared_summed:.2f}%")
+        print(f"_________Total chi squared value_________: {cost:.2f}%")
         print('*************************************************************')
-        return chi_squared_summed
-
+        return cost
     
-    def chi_squared(cls, exp_count, sim_count):
-        chisq_array = (exp_count - sim_count)**2 / (sim_count + 1e-10)
-        chisq = np.sum(chisq_array)
-        return chisq
-    
-    def NCC(cls,exp_counts, sim_counts):
-        # use type hints to make sure histogram are np.array and float type
-        # convert to float64 for precision
-        exp_counts = exp_counts.astype(np.float64).flatten()
-        sim_counts = sim_counts.astype(np.float64).flatten()
-        
-        # calculate means
-        mean_sim = np.mean(sim_counts)
-        mean_exp = np.mean(exp_counts)
-        
-        # center the data
-        sim_centered = sim_counts - mean_sim
-        exp_centered = exp_counts - mean_exp
-        
-        # calculate cross-correlation
-        numerator = np.sum(sim_centered * exp_centered)
-        
-        # calculate standard deviations
-        std_sim = np.sqrt(np.sum(sim_centered ** 2))
-        std_exp = np.sqrt(np.sum(exp_centered ** 2))
-        
-        denominator = std_sim * std_exp
-        
-        # zero variance case
-        # which means no meaningful correlation
-        if denominator < cls.epsilon:
-            return 0.0
-        
-        return numerator / denominator
+    def NCC(cls, exp_counts, sim_counts):
+        """
+        Compute the Normalized Cross-Correlation (NCC) for each layer (2D histogram)
+        in two 3D stacks: experimental and simulated.
 
-    
-    
-    def compare_histograms(cls, sim_counts, exp_counts):
+        Parameters:
+        - exp_counts: ndarray of shape (H, W, N), experimental 2D histograms (N layers)
+        - sim_counts: ndarray of shape (H, W, N), simulated 2D histograms
 
-     chisq_values = []
-     ncc_values = []
-    
-     for i in range(7):
-           
-            print(f"Processing layer {i}, shape: {exp_counts[i].shape}")
-            new_chisq = cls.chi_squared(exp_counts[i], sim_counts)
-            new_ncc = cls.NCC(exp_counts[i],sim_counts)
+        Returns:
+        - nccs: ndarray of shape (N,), NCC for each layer
+        """
+        if exp_counts.shape != sim_counts.shape:
+            raise ValueError("Input shapes must match")
 
-            # Store results in lists
-            chisq_values.append(new_chisq)
-            ncc_values.append(new_ncc)
-        
-            print(f"  Chi-squared: {new_chisq:.6f}")
-            print(f"  NCC: {new_ncc:.6f}")
-        
+        height, width, num_layers = exp_counts.shape
+        nccs = np.zeros(num_layers)
 
-            chisq_tot = np.sum(chisq_values)
-            ncc_tot = np.sum(ncc_values)
+        for i in range(num_layers):
+            exp_layer = exp_counts[:, :, i].astype(np.float64)
+            sim_layer = sim_counts[:, :, i].astype(np.float64)
 
-     return chisq_tot,ncc_tot
-       
-    
+            exp_mean = np.mean(exp_layer)
+            sim_mean = np.mean(sim_layer)
 
-    def compare_histograms(cls, sim_histogram, exp_histogram):
-     chi_squared = 0
-    
-    # Both are 2D arrays: sim_histogram[i,j] and exp_histogram[i,j]
-    # where each bin contains energy deposition, not just counts
-    
-    for i in range(sim_histogram.shape[0]):
-        for j in range(sim_histogram.shape[1]):
-            E_obs = exp_histogram[i, j]    # Observed energy in bin (i,j)
-            E_exp = sim_histogram[i, j]    # Expected energy in bin (i,j)
-            
-            # For energy deposition, variance is more complex
-            if E_obs > 0:
-                # Could use Poisson approximation: σ² ≈ E_obs
-                # Or if you know the number of particles: σ² = N * <E²> - N²<E>²
-                sigma_sq = E_obs  # Simple approximation
-                chi_squared += (E_obs - E_exp)**2 / sigma_sq
-    
-    return chi_squared
+            exp_centered = exp_layer - exp_mean
+            sim_centered = sim_layer - sim_mean
 
+            numerator = np.sum(exp_centered * sim_centered)
+            denominator = np.sqrt(np.sum(exp_centered**2)) * np.sqrt(np.sum(sim_centered**2))
 
+            if denominator < 1e-12:  # Avoid division by zero. 
+                # Most common case for us will be when no particles reach a layer and the histogram is all zeros.
+                nccs[i] = -1.0  # Assign -1 for undefined NCC
+            else:
+                nccs[i] = numerator / denominator
+                
+        ncc = np.mean(nccs)  # Average NCC across all layers
 
-    
+        return ncc
+
 
     def histo_data(cls, x, y, ke, response_funcs):
-    
-        # Energy cut levels
-        stack_fn_cut = [3., 5.821401202856385, 7.997094322613386, 9.658781341633036, 11.148286563497997, 12.435592394828737, 13.723555017136873] 
-        # These are the min energies before a reponse in the reponse function
+        """
+        Generate a 3D stack of 2D histograms representing energy deposition 
+        in successive detector layers (e.g., RCF films), based on particle positions 
+        and kinetic energies, filtered by energy thresholds.
+
+        Parameters:
+        - x, y: arrays of particle positions [m]
+        - ke: array of particle kinetic energies [MeV]
+        - response_funcs: list of vectorized functions, one per RCF film/layer
+
+        Returns:
+        - counts: 3D array (50, 50, n_layers) of normalized 2D histograms
+        """
+
+        # Energy thresholds (MeV) — min energy to register in each film
+        stack_fn_cut = [3., 5.821401202856385, 7.997094322613386, 9.658781341633036, 
+                        11.148286563497997, 12.435592394828737, 13.723555017136873]
 
         print('Getting histogram data')
 
-        for stack in range(len(stack_fn_cut)):
+        # Convert positions to millimetres
+        x_mm = x * 1000
+        y_mm = y * 1000
 
-            # Filter particles based on energy cut
-            cut_x = []
-            cut_y = []
-            cut_energies = []
-            
-            for i in range(len(ke)):
-                if ke[i] > stack_fn_cut[stack]:
-                    cut_energies.append(ke[i])
-                    cut_x.append(x[i]*1000)
-                    cut_y.append(y[i]*1000)
-            
-            deposited_energies = response_funcs(cut_energies)
-            
-            # 2D Histogram (Main plot)
-            new_counts, xedges, yedges = np.histogram2d(cut_x, cut_y, weights=deposited_energies, bins=(50,50))
-            new_counts_norm = new_counts / np.sum(new_counts)
-            #why need expand dimensions
-            new_counts_expnd_dims = np.expand_dims(new_counts_norm, axis=-1)
-            if 'counts' not in locals():
-                counts = new_counts_expnd_dims
-            else:
-                counts = np.concatenate((counts, new_counts_expnd_dims), axis=-1)
+        histograms = []
 
+        for i, cut in enumerate(stack_fn_cut):
+            # Filter particles above threshold
+            mask = ke > cut
+            if not np.any(mask):
+                histograms.append(np.zeros((50, 50)))
+                continue
+
+            ke_filtered = ke[mask]
+            x_filtered = x_mm[mask]
+            y_filtered = y_mm[mask]
+
+            # Compute deposited energy using the response function
+            deposited = response_funcs[i](ke_filtered)
+
+            # 2D histogram of deposited energy
+            hist, xedges, yedges = np.histogram2d(
+                x_filtered, y_filtered,
+                bins=(50, 50),
+                weights=deposited
+            )
+
+            # Normalize to total energy deposited in that film
+            hist_norm = hist / np.sum(hist) if np.sum(hist) > 0 else hist
+            histograms.append(hist_norm)
+
+        # Stack histograms into a 3D array (50, 50, n_layers)
+        counts = np.stack(histograms, axis=-1)
         return counts
-1
+
+
 #--------  Exceptions:
 class noReferenceParticle(Exception):
     pass
