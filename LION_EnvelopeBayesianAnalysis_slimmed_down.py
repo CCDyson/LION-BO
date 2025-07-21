@@ -174,38 +174,6 @@ def main(argv):
         with open(f"stack_response_functions/stack_{stack+1}_response_function.pkl", "rb") as file:
             response_func = pickle.load(file)
             response_functions.append(response_func)
-            
-            
-    # Note to self: Need to verify the way the response functions are loaded and employed
-    
-    # Define a kinetic energy range for testing (adjust as needed)
-    ke_test = np.linspace(0, 20, 500)  # energies from 0 to 20 MeV
-    
-    stack_fn_cut = [3., 5.821401202856385, 7.997094322613386, 9.658781341633036, 
-                        11.148286563497997, 12.435592394828737, 13.723555017136873]
-
-    print('--->Getting histogram data')
-
-    histograms = []
-
-    for i, cut in enumerate(stack_fn_cut):
-        # Filter particles above threshold
-        mask = ke_test > cut
-        if not np.any(mask):
-            histograms.append(np.zeros((50, 50)))
-            continue
-
-        ke_filtered = ke_test[mask]
-        deposited_energy = response_functions[i](ke_filtered)
-        plt.figure(figsize=(10, 6))
-        plt.plot(ke_filtered, deposited_energy, label=f'Stack {i}')
-
-        plt.xlabel('Kinetic Energy (MeV)')
-        plt.ylabel('Deposited Energy (arb. units)')
-        plt.title('Response Functions for Each Stack Layer')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(f'99-Scratch/response_functions_plot_{i}.png')
 
         # This then runs the optimisation
     # The function to be minimised is the cost_function
