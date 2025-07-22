@@ -166,6 +166,38 @@ def main(argv):
     experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
     exp_data_layers = [pd.read_csv('RCF/'+f).to_numpy() for f in experiment_files]
     exp_data = np.stack(exp_data_layers, axis=-1) # shape (H, W, 7) 
+    
+    #Temporary fix to experimental data that will force it to be 50 x 50 bins. 
+    # In future the experimental data will be provided in the correct format
+    # This is a workaround to ensure the optimisation works with the current data
+    # This will need to be removed when the experimental data is provided in the correct format
+    
+    exp_data = exp_data[200:250, 50:100, :]  # Trim to 50x50x7 for now
+    
+    print('Shape of experimental data:', exp_data.shape)  # Should print (50, 50, 7)
+    
+    
+    # This is to check the experimental data looks right. 
+    # Uncomment when the right version of exp_data has been added
+    
+    # nrows, ncols, n_layers = exp_data.shape
+    # extent = [0, ncols, 0, nrows]
+
+    # # Plot each layer
+    # for i in range(n_layers):
+    #     values = exp_data[:, :, i]
+    #     plt.figure(figsize=(6, 5))
+    #     plt.imshow(values,
+    #             extent=extent,
+    #             origin='lower', aspect='auto', cmap='afmhot_r')
+    #     plt.colorbar(label='Energy Deposited')
+    #     plt.title(f'2D Histogram of Layer {i+1} ({experiment_files[i]})')
+    #     plt.xlabel('X')
+    #     plt.ylabel('Y')
+    #     plt.grid(True)
+    #     plt.tight_layout()
+    #     plt.savefig(f"99-Scratch/2D_Histogram_Layer_{i+1}.png")
+
 
     response_functions = []  # Initialize as list
     for stack in range(7):
