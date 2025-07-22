@@ -52,6 +52,7 @@ import Particle        as Prtcl
 import BeamLine        as BL
 import BeamLineElement as BLE
 import PhysicalConstants as PC
+import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional, Union
 import os
 print(f"Running Optimisation from: {os.path.abspath(__file__)}")
@@ -86,9 +87,8 @@ class UserAnal:
         self.getBLEparams().append(["LION:1:Capture:Dquad:1", 0.02,318.5, 0.01, 0.0, 0.0, 0.0, 0.0])
         self.getBLEparams().append(["LION:1:Capture:Circular:4",  0, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.getBLEparams().append(["LION:1:Delivery:Drift:1", 1.76543])
-        self.getBLEparams().append(["LION:1:Delivery:Drift:2", 0.01])
-        self.getBLEparams().append(["LION:1:Delivery:Circular:1", 0, 0.005])
-        self.getBLEparams().append(["LION:1:Delivery:Drift:3", 0.02])
+        self.getBLEparams().append(["LION:1:Delivery:Circular:1", 0, 0.03])
+
 
    
        
@@ -137,7 +137,6 @@ class UserAnal:
         iBLE    = BLE.Aperture(self.getBLEparams()[1][0], rStrt, vStrt, drStrt, dvStrt,[self.getBLEparams()[1][1],self.getBLEparams()[1][2],self.getBLEparams()[1][3]])
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
-        print('here')
         #.. Focussing quadrupole:
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
         iBLE    = BLE.Aperture(self.getBLEparams()[2][0],    \
@@ -205,30 +204,13 @@ class UserAnal:
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
 
-        #.. Add delivery drift 2:
-        rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Drift(self.getBLEparams()[10][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, \
-                            self.getBLEparams()[10][1])
-        BL.BeamLine.addBeamLineElement(iBLE)
-        refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
-
         #.. Add delivery collimator
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Aperture(self.getBLEparams()[11][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, [self.getBLEparams()[11][1],self.getBLEparams()[11][2]])
+        iBLE    = BLE.Aperture(self.getBLEparams()[10][0],    \
+                            rStrt, vStrt, drStrt, dvStrt, [self.getBLEparams()[10][1],self.getBLEparams()[10][2]])
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
 
-
-        #.. Add delivery drift 3;
-        rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Drift(self.getBLEparams()[12][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, \
-                            self.getBLEparams()[12
-                                                ][1])
-        BL.BeamLine.addBeamLineElement(iBLE)
-        refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
         
         #--------  Print at end:
         if self.getDebug():
@@ -361,16 +343,18 @@ class UserAnal:
         ke = np.array(ke)
 
         histograms = []
+        xedgeses = []
+        yedgeses = []
 
         for i, cut in enumerate(stack_fn_cut):
             # Filter particles above threshold
             mask = ke > cut
             if not np.any(mask):
                 histograms.append(np.zeros((50, 50)))
+                xedgeses.append(np.linspace(0, 1, 51))  # dummy edges
+                yedgeses.append(np.linspace(0, 1, 51))  # dummy edges
                 continue
-            
-            print(ke, x_mm.shape, y_mm.shape)
-            print(mask.shape)
+
             ke_filtered = ke[mask]
             x_filtered = x_mm[mask]
             y_filtered = y_mm[mask]
@@ -384,17 +368,25 @@ class UserAnal:
                 bins=(50, 50),
                 weights=deposited
             )
+            print(np.shape(xedges), np.shape(yedges))
 
             # Normalize to total energy deposited in that film
             hist_norm = hist / np.sum(hist) if np.sum(hist) > 0 else hist
             histograms.append(hist_norm)
-            
+            xedgeses.append(xedges)
+            yedgeses.append(yedges)
+
         print(np.shape(histograms))
+        print(np.shape(xedgeses)) 
+        print(np.shape(yedgeses))
 
         # Stack histograms into a 3D array (50, 50, n_layers)
         counts = np.stack(histograms, axis=-1)
+
         print(counts.shape)
-        return counts
+        print(np.shape(xedgeses))
+        print(np.shape(yedgeses))
+        return counts, xedgeses, yedgeses
     
     def NCC(cls, sim_counts, exp_counts):
         """
@@ -437,6 +429,26 @@ class UserAnal:
         ncc = np.mean(nccs)  # Average NCC across all layers
 
         return ncc
+    
+    def plot_histograms(cls, histogram_counts, xedges, yedges):
+
+        for i in range(histogram_counts.shape[-1]):
+            print(f"Plotting histogram for layer {i+1}")
+            values = histogram_counts[:, :, i]
+            xedges_i = xedges[i]
+            yedges_i = yedges[i]
+            extent = [xedges_i[0], xedges_i[-1], yedges_i[0], yedges_i[-1]]
+
+            plt.figure(figsize=(6, 5))
+            plt.imshow(values.T,origin='lower', extent=extent, aspect='auto', cmap='afmhot_r')
+            plt.colorbar(label='Energy Deposited')
+            plt.title(f'Simulated 2D Histogram for Layer {i+1}')
+            plt.xlabel('X (cm)')
+            plt.ylabel('Y (cm)')
+            plt.grid(True)
+            plt.savefig(f'histogram_layer_{i+1}.png', dpi=300)
+            
+        return 0
 
 
     def calc_cost(cls, response_funcs, exp_data):
@@ -480,17 +492,17 @@ class UserAnal:
             return 0
 
         Particles = Prtcl.Particle.getinstances()
+        x=[]
+        y=[]
+        ke=[]
+        num_beamline_elements = 11
+        
         for iPrtcl in Particles:
             
             trace_space = iPrtcl.getTraceSpace()
             # Check on trace space to avoid IndexError
             # ie checks if the particle has reached the end of the beamline
             # and has a valid trace space
-            
-            num_beamline_elements = 9
-            x=[]
-            y=[]
-            ke=[]
         
             if len(trace_space) > num_beamline_elements and len(trace_space[num_beamline_elements]) >= 3:
                 phase = Prtcl.Particle.RPLCTraceSpace2PhaseSpace(trace_space[-1])
@@ -503,12 +515,12 @@ class UserAnal:
                     x.append(x_end)
                     y.append(y_end)
                     ke.append(ke_end)
-                    
             # Clean memory after saving particle
             Prtcl.Particle.cleanParticles()
-        print("Particles Collected")
+            
+        print("Particles Collected:", len(x))
         
-        histogram_counts = cls.histo_data(x, y, ke, response_funcs)
+        histogram_counts, xedges, yedges = cls.histo_data(x, y, ke, response_funcs)
         print("Histograms Created")
         
         cost = 1 - cls.NCC(histogram_counts, exp_data)
@@ -516,7 +528,13 @@ class UserAnal:
         print('*************************************************************')
         print(f"_________Total cost value_________: {cost:.2f}")
         print('*************************************************************')
+        
+        
+        # Added section to plot the histograms to see if the parameters are changing the beam as expected
+        cls.plot_histograms(histogram_counts, xedges, yedges)
+        
         return cost
+    
 
 
 

@@ -83,9 +83,7 @@ def cost_function(params, nEvts, response_funcs, exp_data):
         [startBLEparams[7][0], 0.02,318.5, x2,y2,a2,b2,g2],
         [startBLEparams[8][0], 0,0.005,x2,y2,a2,b2,g2],
         [startBLEparams[9][0], 1.76543],
-        [startBLEparams[10][0], 0.01],
-        [startBLEparams[11][0], 0,0.005],
-        [startBLEparams[12][0], 0.02]
+        [startBLEparams[10][0], 0,0.03],
     ])
     # Sets the new complete beamline
     iEO.setBeamLine()
@@ -162,6 +160,8 @@ def main(argv):
               Real(-0.1, 0.1, name='g2'),
              ]
     
+    
+    
     # Collect some constants before running the optimisation
     experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
     exp_data_layers = [pd.read_csv('RCF/'+f).to_numpy() for f in experiment_files]
@@ -197,6 +197,7 @@ def main(argv):
     #     plt.grid(True)
     #     plt.tight_layout()
     #     plt.savefig(f"99-Scratch/2D_Histogram_Layer_{i+1}.png")
+    
 
 
     response_functions = []  # Initialize as list
@@ -206,6 +207,13 @@ def main(argv):
         with open(f"stack_response_functions/stack_{stack+1}_response_function.pkl", "rb") as file:
             response_func = pickle.load(file)
             response_functions.append(response_func)
+            
+    
+    x = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # Initial guess for the parameters 
+            
+    test = cost_function(x, nEvts, response_functions, exp_data)
+    
+    return 0
 
         # This then runs the optimisation
     # The function to be minimised is the cost_function
