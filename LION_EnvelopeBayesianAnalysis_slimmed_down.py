@@ -37,17 +37,22 @@ def cost_function(params, nEvts, response_funcs, exp_data):
     x1, y1, a1, b1, g1, x2, y2, a2, b2, g2  = params
  
 
-    print('x shift 1:', x1)
-    print('y shift 1:', y1)
-    print('x shift 2:', x2)
-    print('y shift 2:', y2)
-    print('alpha tilt 1:', a1)
-    print('beta tilt 1:', b1)
-    print('gamma tilt 1:', g1)
-    print('alpha tilt 2:', a2)
-    print('beta tilt 2:', b2)
-    print('gamma tilt 2:', g2)
+    print('x shift 1:', x1, 'mm')
+    print('y shift 1:', y1, 'mm')
+    print('x shift 2:', x2, 'mm')
+    print('y shift 2:', y2, 'mm')
+    print('alpha tilt 1:', a1, 'rad')
+    print('beta tilt 1:', b1, 'rad')
+    print('gamma tilt 1:', g1, 'rad')
+    print('alpha tilt 2:', a2, 'rad')
+    print('beta tilt 2:', b2, 'rad')
+    print('gamma tilt 2:', g2, 'rad')
     
+    x1 = x1 / 1000  # Convert mm to m
+    y1 = y1 / 1000  # Convert mm to m
+    x2 = x2 / 1000  # Convert mm to m
+    y2 = y2 / 1000  # Convert mm to m
+
 
     #.. ----> Instanciate user analysis:
     iEO = EO.UserAnal.getUserAnalInstances()[0]
@@ -145,23 +150,6 @@ def main(argv):
     # Checks the beamline looks correct
     print(BL.BeamLine.getinstances())
     
-    # Defines the limits of the search space for the parameters
-    # Will need to be changed to the limits of the tilts and shifts of the PMQs 
-    space = [ \
-              Real(-0.1, 0.1, name='x1'), \
-              Real(-0.1, 0.1, name='y1'),
-              Real(-0.1, 0.1, name='a1'),
-              Real(-0.1, 0.1, name='b1'),
-              Real(-0.1, 0.1, name='g1'),
-              Real(-0.1, 0.1, name='x2'),
-              Real(-0.1, 0.1, name='y2'),
-              Real(-0.1, 0.1, name='a2'),
-              Real(-0.1, 0.1, name='b2'),
-              Real(-0.1, 0.1, name='g2'),
-             ]
-    
-    
-    
     # Collect some constants before running the optimisation
     experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
     exp_data_layers = [pd.read_csv('RCF/'+f).to_numpy() for f in experiment_files]
@@ -196,7 +184,7 @@ def main(argv):
     #     plt.ylabel('Y')
     #     plt.grid(True)
     #     plt.tight_layout()
-    #     plt.savefig(f"99-Scratch/2D_Histogram_Layer_{i+1}.png")
+    #     plt.savefig(f"99-Scratch/exp_data_{i+1}.png")
     
 
 
@@ -209,11 +197,26 @@ def main(argv):
             response_functions.append(response_func)
             
     
-    x = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]  # Initial guess for the parameters 
+    x = [0.5, 0, 0.1, 0, 0, 0, 0, 0, 0, 0]  # Initial guess for the parameters 
             
     test = cost_function(x, nEvts, response_functions, exp_data)
     
     return 0
+
+    # Defines the limits of the search space for the parameters
+    # Will need to be changed to the limits of the tilts and shifts of the PMQs 
+    space = [ \
+              Real(-0.1, 0.1, name='x1'), \
+              Real(-0.1, 0.1, name='y1'),
+              Real(-0.1, 0.1, name='a1'),
+              Real(-0.1, 0.1, name='b1'),
+              Real(-0.1, 0.1, name='g1'),
+              Real(-0.1, 0.1, name='x2'),
+              Real(-0.1, 0.1, name='y2'),
+              Real(-0.1, 0.1, name='a2'),
+              Real(-0.1, 0.1, name='b2'),
+              Real(-0.1, 0.1, name='g2'),
+             ]
 
         # This then runs the optimisation
     # The function to be minimised is the cost_function

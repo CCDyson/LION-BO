@@ -137,6 +137,8 @@ class UserAnal:
         iBLE    = BLE.Aperture(self.getBLEparams()[1][0], rStrt, vStrt, drStrt, dvStrt,[self.getBLEparams()[1][1],self.getBLEparams()[1][2],self.getBLEparams()[1][3]])
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
+        
+        
         #.. Focussing quadrupole:
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
         iBLE    = BLE.Aperture(self.getBLEparams()[2][0],    \
@@ -145,8 +147,6 @@ class UserAnal:
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
         
-
-
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
         iBLE    = BLE.FocusQuadrupole(self.getBLEparams()[3][0],    \
                             rStrt, vStrt, drStrt, dvStrt, \
@@ -368,7 +368,6 @@ class UserAnal:
                 bins=(50, 50),
                 weights=deposited
             )
-            print(np.shape(xedges), np.shape(yedges))
 
             # Normalize to total energy deposited in that film
             hist_norm = hist / np.sum(hist) if np.sum(hist) > 0 else hist
@@ -376,16 +375,9 @@ class UserAnal:
             xedgeses.append(xedges)
             yedgeses.append(yedges)
 
-        print(np.shape(histograms))
-        print(np.shape(xedgeses)) 
-        print(np.shape(yedgeses))
-
         # Stack histograms into a 3D array (50, 50, n_layers)
         counts = np.stack(histograms, axis=-1)
-
-        print(counts.shape)
-        print(np.shape(xedgeses))
-        print(np.shape(yedgeses))
+        
         return counts, xedgeses, yedgeses
     
     def NCC(cls, sim_counts, exp_counts):
@@ -446,8 +438,8 @@ class UserAnal:
             plt.xlabel('X (cm)')
             plt.ylabel('Y (cm)')
             plt.grid(True)
-            plt.savefig(f'histogram_layer_{i+1}.png', dpi=300)
-            
+            plt.savefig(f'99-Scratch/sim_data_histogram_layer_{i+1}.png', dpi=300)
+
         return 0
 
 
