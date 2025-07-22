@@ -89,7 +89,7 @@ def cost_function(params, nEvts, response_funcs, exp_data):
     ])
     # Sets the new complete beamline
     iEO.setBeamLine()
-    print(BL.BeamLine.getinstances())
+    # print(BL.BeamLine.getinstances())
     
     # Tracks the beam through the beamline
     nEvtGen = BL.BeamLine.getinstances().trackBeam(nEvts, \
@@ -150,16 +150,16 @@ def main(argv):
     # Defines the limits of the search space for the parameters
     # Will need to be changed to the limits of the tilts and shifts of the PMQs 
     space = [ \
-              Integer(-0.1, 0.1, name='x1'), \
-              Integer(-0.1, 0.1, name='y1'),
-              Integer(-0.1, 0.1, name='a1'),
-              Integer(-0.1, 0.1, name='b1'),
-              Integer(-0.1, 0.1, name='g1'),
-              Integer(-0.1, 0.1, name='x2'),
-              Integer(-0.1, 0.1, name='y2'),
-              Integer(-0.1, 0.1, name='a2'),
-              Integer(-0.1, 0.1, name='b2'),
-              Integer(-0.1, 0.1, name='g2'),
+              Real(-0.1, 0.1, name='x1'), \
+              Real(-0.1, 0.1, name='y1'),
+              Real(-0.1, 0.1, name='a1'),
+              Real(-0.1, 0.1, name='b1'),
+              Real(-0.1, 0.1, name='g1'),
+              Real(-0.1, 0.1, name='x2'),
+              Real(-0.1, 0.1, name='y2'),
+              Real(-0.1, 0.1, name='a2'),
+              Real(-0.1, 0.1, name='b2'),
+              Real(-0.1, 0.1, name='g2'),
              ]
     
     # Collect some constants before running the optimisation
@@ -214,8 +214,8 @@ def main(argv):
     # The verbose is set to True, so it will print out the progress
     res = gp_minimize(lambda x: cost_function(x, nEvts, response_functions, exp_data), \
                       space, \
-                      n_calls=150, \
-                      n_initial_points=10, \
+                      n_calls=2, \
+                      n_initial_points=1, \
                       random_state=None, \
                       acq_func="EI", \
                       verbose=True)
@@ -250,8 +250,8 @@ def main(argv):
         print('Iteration state number __________ :', iteration_number)
         print('************************************')
         res = gp_minimize(lambda x: cost_function(x, nEvts, response_functions, exp_data), space, \
-                      n_calls=150, \
-                      n_initial_points=20, \
+                      n_calls=10, \
+                      n_initial_points=1, \
                       random_state=state, \
                       acq_func="EI", \
                       verbose=True)

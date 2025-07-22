@@ -356,8 +356,8 @@ class UserAnal:
         print('Getting histogram data')
 
         # Convert positions to millimetres
-        x_mm = np.array(x * 1000)
-        y_mm = np.array(y * 1000)
+        x_mm = np.array(x) * 1000.0  # Convert from m to mm
+        y_mm = np.array(y) * 1000.0  # Convert from m
         ke = np.array(ke)
 
         histograms = []
@@ -368,7 +368,9 @@ class UserAnal:
             if not np.any(mask):
                 histograms.append(np.zeros((50, 50)))
                 continue
-
+            
+            print(ke, x_mm.shape, y_mm.shape)
+            print(mask.shape)
             ke_filtered = ke[mask]
             x_filtered = x_mm[mask]
             y_filtered = y_mm[mask]
@@ -512,7 +514,7 @@ class UserAnal:
         cost = 1 - cls.NCC(histogram_counts, exp_data)
         
         print('*************************************************************')
-        print(f"_________Total cost value_________: {cost:.2f}%")
+        print(f"_________Total cost value_________: {cost:.2f}")
         print('*************************************************************')
         return cost
 
