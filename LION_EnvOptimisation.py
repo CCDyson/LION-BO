@@ -52,7 +52,10 @@ import Particle        as Prtcl
 import BeamLine        as BL
 import BeamLineElement as BLE
 import PhysicalConstants as PC
+import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple, Optional, Union
+import os
+print(f"Running Optimisation from: {os.path.abspath(__file__)}")
 
 class UserAnal:
     instances  = []
@@ -73,7 +76,6 @@ class UserAnal:
         
         # Sets default beam line parameters
 
-
         self.getBLEparams().append(["LION:1:Capture:Drift:1", 0.04694])
         self.getBLEparams().append(["LION:1:Capture:Elliptical:1",1,0.003,0.0015])
         self.getBLEparams().append(["LION:1:Capture:Circular:1",  0, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -84,12 +86,7 @@ class UserAnal:
         self.getBLEparams().append(["LION:1:Capture:Dquad:1", 0.02,318.5, 0.01, 0.0, 0.0, 0.0, 0.0])
         self.getBLEparams().append(["LION:1:Capture:Circular:4",  0, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.getBLEparams().append(["LION:1:Delivery:Drift:1", 1.76543])
-        self.getBLEparams().append(["LION:1:Delivery:Drift:2", 0.01])
-        self.getBLEparams().append(["LION:1:Delivery:Circular:1", 0, 0.005])
-        self.getBLEparams().append(["LION:1:Delivery:Drift:3", 0.02])
-
-   
-       
+        self.getBLEparams().append(["LION:1:Delivery:Circular:1", 0, 0.03])
 
 
         self.setstartBLEparams(self.getBLEparams())
@@ -135,7 +132,8 @@ class UserAnal:
         iBLE    = BLE.Aperture(self.getBLEparams()[1][0], rStrt, vStrt, drStrt, dvStrt,[self.getBLEparams()[1][1],self.getBLEparams()[1][2],self.getBLEparams()[1][3]])
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
-        print('here')
+        
+        
         #.. Focussing quadrupole:
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
         iBLE    = BLE.Aperture(self.getBLEparams()[2][0],    \
@@ -144,8 +142,6 @@ class UserAnal:
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
         
-
-
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
         iBLE    = BLE.FocusQuadrupole(self.getBLEparams()[3][0],    \
                             rStrt, vStrt, drStrt, dvStrt, \
@@ -203,30 +199,13 @@ class UserAnal:
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
 
-        #.. Add delivery drift 2:
-        rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Drift(self.getBLEparams()[10][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, \
-                            self.getBLEparams()[10][1])
-        BL.BeamLine.addBeamLineElement(iBLE)
-        refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
-
         #.. Add delivery collimator
         rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Aperture(self.getBLEparams()[11][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, [self.getBLEparams()[11][1],self.getBLEparams()[11][2]])
+        iBLE    = BLE.Aperture(self.getBLEparams()[10][0],    \
+                            rStrt, vStrt, drStrt, dvStrt, [self.getBLEparams()[10][1],self.getBLEparams()[10][2]])
         BL.BeamLine.addBeamLineElement(iBLE)
         refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
 
-
-        #.. Add delivery drift 3;
-        rStrt  = iBLE.getrStrt() + iBLE.getStrt2End()
-        iBLE    = BLE.Drift(self.getBLEparams()[12][0],    \
-                            rStrt, vStrt, drStrt, dvStrt, \
-                            self.getBLEparams()[12
-                                                ][1])
-        BL.BeamLine.addBeamLineElement(iBLE)
-        refPrtclSet = refPrtcl.setReferenceParticle(iBLE)
         
         #--------  Print at end:
         if self.getDebug():
@@ -331,13 +310,166 @@ class UserAnal:
                 iPrtcl.writeParticle(ibmIOw)
         
         Prtcl.Particle.cleanParticles()
-
-
-    def calculate_chi_squared(cls, response_funcs, exp_data, sim_data):
-        # This is the function called in the main script to calculate the transmission
-        # I left this in for reference. We will change it to be calculate chi squared
         
-        # Set the threshold for the beam size at the end of the beamline
+    def histo_data(cls, x, y, ke, response_funcs):
+        """
+        Generate a 3D stack of 2D histograms representing energy deposition 
+        in successive detector layers (e.g., RCF films), based on particle positions 
+        and kinetic energies, filtered by energy thresholds.
+
+        Parameters:
+        - x, y: arrays of particle positions [m]
+        - ke: array of particle kinetic energies [MeV]
+        - response_funcs: list of vectorized functions, one per RCF film/layer
+
+        Returns:
+        - counts: 3D array (50, 50, n_layers) of normalized 2D histograms
+        """
+
+        # Energy thresholds (MeV) — min energy to register in each film
+        stack_fn_cut = [3., 5.821401202856385, 7.997094322613386, 9.658781341633036, 
+                        11.148286563497997, 12.435592394828737, 13.723555017136873]
+
+        print('Getting histogram data')
+
+        # Convert positions to millimetres
+        x_mm = np.array(x) * 1000.0  # Convert from m to mm
+        y_mm = np.array(y) * 1000.0  # Convert from m
+        ke = np.array(ke)
+
+        histograms = []
+        xedgeses = []
+        yedgeses = []
+
+        for i, cut in enumerate(stack_fn_cut):
+            # Filter particles above threshold
+            mask = ke > cut
+            if not np.any(mask):
+                histograms.append(np.zeros((50, 50)))
+                xedgeses.append(np.linspace(0, 1, 51))  # dummy edges
+                yedgeses.append(np.linspace(0, 1, 51))  # dummy edges
+                continue
+
+            ke_filtered = ke[mask]
+            x_filtered = x_mm[mask]
+            y_filtered = y_mm[mask]
+
+            # Compute deposited energy using the response function
+            deposited = response_funcs[i](ke_filtered)
+
+            # 2D histogram of deposited energy
+            hist, xedges, yedges = np.histogram2d(
+                x_filtered, y_filtered,
+                bins=(50, 50),
+                weights=deposited
+            )
+
+            # Normalize to total energy deposited in that film
+            hist_norm = hist / np.sum(hist) if np.sum(hist) > 0 else hist
+            histograms.append(hist_norm)
+            xedgeses.append(xedges)
+            yedgeses.append(yedges)
+
+        # Stack histograms into a 3D array (50, 50, n_layers)
+        counts = np.stack(histograms, axis=-1)
+        
+        return counts, xedgeses, yedgeses
+    
+    def NCC(cls, sim_counts, exp_counts):
+        """
+        Compute the Normalized Cross-Correlation (NCC) for each layer (2D histogram)
+        in two 3D stacks: experimental and simulated.
+
+        Parameters:
+        - exp_counts: ndarray of shape (H, W, N), experimental 2D histograms (N layers)
+        - sim_counts: ndarray of shape (H, W, N), simulated 2D histograms
+
+        Returns:
+        - nccs: ndarray of shape (N,), NCC for each layer
+        """
+        
+        if exp_counts.shape != sim_counts.shape:
+            raise ValueError("Input shapes must match \n(exp_counts: {}, sim_counts: {})".format(exp_counts.shape, sim_counts.shape))
+
+        height, width, num_layers = exp_counts.shape
+        nccs = np.zeros(num_layers)
+
+        for i in range(num_layers):
+            exp_layer = exp_counts[:, :, i].astype(np.float64)
+            sim_layer = sim_counts[:, :, i].astype(np.float64)
+
+            exp_mean = np.mean(exp_layer)
+            sim_mean = np.mean(sim_layer)
+
+            exp_centered = exp_layer - exp_mean
+            sim_centered = sim_layer - sim_mean
+
+            numerator = np.sum(exp_centered * sim_centered)
+            denominator = np.sqrt(np.sum(exp_centered**2)) * np.sqrt(np.sum(sim_centered**2))
+
+            if denominator < 1e-12:  # Avoid division by zero. 
+                # Most common case for us will be when no particles reach a layer and the histogram is all zeros.
+                nccs[i] = -1.0  # Assign -1 for undefined NCC
+            else:
+                nccs[i] = numerator / denominator
+                
+        ncc = np.mean(nccs)  # Average NCC across all layers
+
+        return ncc
+    
+    def plot_histograms(cls, histogram_counts, xedges, yedges):
+
+        for i in range(histogram_counts.shape[-1]):
+            print(f"Plotting histogram for layer {i+1}")
+            values = histogram_counts[:, :, i]
+            xedges_i = xedges[i]
+            yedges_i = yedges[i]
+            extent = [xedges_i[0], xedges_i[-1], yedges_i[0], yedges_i[-1]]
+
+            plt.figure(figsize=(6, 5))
+            plt.imshow(values.T,origin='lower', extent=extent, aspect='auto', cmap='afmhot_r')
+            plt.colorbar(label='Energy Deposited')
+            plt.title(f'Simulated 2D Histogram for Layer {i+1}')
+            plt.xlabel('X (cm)')
+            plt.ylabel('Y (cm)')
+            plt.grid(True)
+            plt.savefig(f'99-Scratch/sim_data_histogram_layer_{i+1}.png', dpi=300)
+
+        return 0
+
+
+    def calc_cost(cls, response_funcs, exp_data):
+        """
+        Calculate the cost (1 - normalized cross correlation) between simulated and experimental data.
+
+        This method is typically called in the main script to compute how well the simulated particle
+        transmission matches experimental measurements, expressed via a cost function suitable for minimization.
+
+        Steps:
+        - Retrieves all existing particle instances and their trace space through the beamline.
+        - Extracts particle end positions (x, y) and kinetic energies (ke) after the final beamline element.
+        - Uses provided response functions to convert kinetic energies to deposited energies in a detector stack.
+        - Builds histograms of deposited energies spatially.
+        - Compares simulated histograms with experimental histograms using normalized cross correlation (NCC).
+        - Computes cost as 1 - NCC, where lower cost indicates better agreement.
+
+        Parameters:
+        - response_funcs : list of callables
+            List of response functions for each detector layer. Each function maps kinetic energies to deposited energies.
+        - exp_data : np.ndarray
+            Experimental histogram data to compare against (shape should match histograms produced by `histo_data`).
+
+        Returns:
+        - cost : float
+            A scalar cost value representing the mismatch between simulation and experiment.
+            Returns 0 if no particles are available.
+
+        Notes:
+        - Assumes the particle mass for protons is retrieved internally.
+        - Assumes beamline consists of 9 elements, and trace space data length and shape are checked accordingly.
+        - Cleans particle instances from memory after processing.
+        """
+        # This is the function called in the main script to calculate the transmission
         
         pmass = PC.PhysicalConstants().getparticleMASS('Proton')  # MeV/c^2
         nEvts = len(Prtcl.Particle.getinstances())
@@ -347,17 +479,17 @@ class UserAnal:
             return 0
 
         Particles = Prtcl.Particle.getinstances()
+        x=[]
+        y=[]
+        ke=[]
+        num_beamline_elements = 11
+        
         for iPrtcl in Particles:
             
             trace_space = iPrtcl.getTraceSpace()
             # Check on trace space to avoid IndexError
             # ie checks if the particle has reached the end of the beamline
             # and has a valid trace space
-            
-            num_beamline_elements = 9
-            x=[]
-            y=[]
-            ke=[]
         
             if len(trace_space) > num_beamline_elements and len(trace_space[num_beamline_elements]) >= 3:
                 phase = Prtcl.Particle.RPLCTraceSpace2PhaseSpace(trace_space[-1])
@@ -370,141 +502,30 @@ class UserAnal:
                     x.append(x_end)
                     y.append(y_end)
                     ke.append(ke_end)
-
-        histogram_counts = cls.histo_data(x, y, ke, response_funcs)
+            # Clean memory after saving particle
+            Prtcl.Particle.cleanParticles()
+            
+        print("Particles Collected:", len(x))
         
-        chi_squared_summed = cls.compare_histograms(histogram_counts, exp_data, sim_data)
+        histogram_counts, xedges, yedges = cls.histo_data(x, y, ke, response_funcs)
+        print("Histograms Created")
         
+        cost = 1 - cls.NCC(histogram_counts, exp_data)
         
-
         print('*************************************************************')
-        print(f"_________Total chi squared value_________: {chi_squared_summed:.2f}%")
+        print(f"_________Total cost value_________: {cost:.2f}")
         print('*************************************************************')
-        return chi_squared_summed
-
-    
-    def chi_squared(cls, exp_count, sim_count):
-        chisq_array = (exp_count - sim_count)**2 / (sim_count + 1e-10)
-        chisq = np.sum(chisq_array)
-        return chisq
-    
-    def NCC(cls,exp_counts, sim_counts):
-        # use type hints to make sure histogram are np.array and float type
-        # convert to float64 for precision
-        exp_counts = exp_counts.astype(np.float64).flatten()
-        sim_counts = sim_counts.astype(np.float64).flatten()
         
-        # calculate means
-        mean_sim = np.mean(sim_counts)
-        mean_exp = np.mean(exp_counts)
         
-        # center the data
-        sim_centered = sim_counts - mean_sim
-        exp_centered = exp_counts - mean_exp
+        # Added section to plot the histograms to see if the parameters are changing the beam as expected
+        cls.plot_histograms(histogram_counts, xedges, yedges)
         
-        # calculate cross-correlation
-        numerator = np.sum(sim_centered * exp_centered)
-        
-        # calculate standard deviations
-        std_sim = np.sqrt(np.sum(sim_centered ** 2))
-        std_exp = np.sqrt(np.sum(exp_centered ** 2))
-        
-        denominator = std_sim * std_exp
-        
-        # zero variance case
-        # which means no meaningful correlation
-        if denominator < cls.epsilon:
-            return 0.0
-        
-        return numerator / denominator
-
-    
-    
-    def compare_histograms(cls, sim_counts, exp_counts):
-
-     chisq_values = []
-     ncc_values = []
-    
-     for i in range(7):
-           
-            print(f"Processing layer {i}, shape: {exp_counts[i].shape}")
-            new_chisq = cls.chi_squared(exp_counts[i], sim_counts)
-            new_ncc = cls.NCC(exp_counts[i],sim_counts)
-
-            # Store results in lists
-            chisq_values.append(new_chisq)
-            ncc_values.append(new_ncc)
-        
-            print(f"  Chi-squared: {new_chisq:.6f}")
-            print(f"  NCC: {new_ncc:.6f}")
-        
-
-            chisq_tot = np.sum(chisq_values)
-            ncc_tot = np.sum(ncc_values)
-
-     return chisq_tot,ncc_tot
-       
+        return cost
     
 
-    def compare_histograms(cls, sim_histogram, exp_histogram):
-     chi_squared = 0
-    
-    # Both are 2D arrays: sim_histogram[i,j] and exp_histogram[i,j]
-    # where each bin contains energy deposition, not just counts
-    
-    for i in range(sim_histogram.shape[0]):
-        for j in range(sim_histogram.shape[1]):
-            E_obs = exp_histogram[i, j]    # Observed energy in bin (i,j)
-            E_exp = sim_histogram[i, j]    # Expected energy in bin (i,j)
-            
-            # For energy deposition, variance is more complex
-            if E_obs > 0:
-                # Could use Poisson approximation: σ² ≈ E_obs
-                # Or if you know the number of particles: σ² = N * <E²> - N²<E>²
-                sigma_sq = E_obs  # Simple approximation
-                chi_squared += (E_obs - E_exp)**2 / sigma_sq
-    
-    return chi_squared
 
 
 
-    
-
-    def histo_data(cls, x, y, ke, response_funcs):
-    
-        # Energy cut levels
-        stack_fn_cut = [3., 5.821401202856385, 7.997094322613386, 9.658781341633036, 11.148286563497997, 12.435592394828737, 13.723555017136873] 
-        # These are the min energies before a reponse in the reponse function
-
-        print('Getting histogram data')
-
-        for stack in range(len(stack_fn_cut)):
-
-            # Filter particles based on energy cut
-            cut_x = []
-            cut_y = []
-            cut_energies = []
-            
-            for i in range(len(ke)):
-                if ke[i] > stack_fn_cut[stack]:
-                    cut_energies.append(ke[i])
-                    cut_x.append(x[i]*1000)
-                    cut_y.append(y[i]*1000)
-            
-            deposited_energies = response_funcs(cut_energies)
-            
-            # 2D Histogram (Main plot)
-            new_counts, xedges, yedges = np.histogram2d(cut_x, cut_y, weights=deposited_energies, bins=(50,50))
-            new_counts_norm = new_counts / np.sum(new_counts)
-            #why need expand dimensions
-            new_counts_expnd_dims = np.expand_dims(new_counts_norm, axis=-1)
-            if 'counts' not in locals():
-                counts = new_counts_expnd_dims
-            else:
-                counts = np.concatenate((counts, new_counts_expnd_dims), axis=-1)
-
-        return counts
-1
 #--------  Exceptions:
 class noReferenceParticle(Exception):
     pass

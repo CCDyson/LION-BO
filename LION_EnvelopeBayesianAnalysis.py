@@ -19,6 +19,7 @@ import LION_EnvOptimisation as EO
 import BeamLineElement      as BLE
 import UserFramework        as UsrFw
 import pickle
+import matplotlib.pyplot as plt
 
 #This script is a rewording of the UserAnalysis.py script that you should have in your 03-Scripts folder
 # It will be what we run to optimise the beamline
@@ -36,17 +37,22 @@ def cost_function(params, nEvts, response_funcs, exp_data):
     x1, y1, a1, b1, g1, x2, y2, a2, b2, g2  = params
  
 
-    print('x shift 1:', x1)
-    print('y shift 1:', y1)
-    print('x shift 2:', x2)
-    print('y shift 2:', y2)
-    print('alpha tilt 1:', a1)
-    print('beta tilt 1:', b1)
-    print('gamma tilt 1:', g1)
-    print('alpha tilt 2:', a2)
-    print('beta tilt 2:', b2)
-    print('gamma tilt 2:', g2)
+    print('x shift 1:', x1, 'mm')
+    print('y shift 1:', y1, 'mm')
+    print('x shift 2:', x2, 'mm')
+    print('y shift 2:', y2, 'mm')
+    print('alpha tilt 1:', a1, 'rad')
+    print('beta tilt 1:', b1, 'rad')
+    print('gamma tilt 1:', g1, 'rad')
+    print('alpha tilt 2:', a2, 'rad')
+    print('beta tilt 2:', b2, 'rad')
+    print('gamma tilt 2:', g2, 'rad')
     
+    x1 = x1 / 1000  # Convert mm to m
+    y1 = y1 / 1000  # Convert mm to m
+    x2 = x2 / 1000  # Convert mm to m
+    y2 = y2 / 1000  # Convert mm to m
+
 
     #.. ----> Instanciate user analysis:
     iEO = EO.UserAnal.getUserAnalInstances()[0]
@@ -82,29 +88,21 @@ def cost_function(params, nEvts, response_funcs, exp_data):
         [startBLEparams[7][0], 0.02,318.5, x2,y2,a2,b2,g2],
         [startBLEparams[8][0], 0,0.005,x2,y2,a2,b2,g2],
         [startBLEparams[9][0], 1.76543],
-        [startBLEparams[10][0], 0.01],
-        [startBLEparams[11][0], 0,0.005],
-        [startBLEparams[12][0], 0.02]
+        [startBLEparams[10][0], 0,0.03],
     ])
     # Sets the new complete beamline
     iEO.setBeamLine()
-    print(BL.BeamLine.getinstances())
+    # print(BL.BeamLine.getinstances())
     
     # Tracks the beam through the beamline
     nEvtGen = BL.BeamLine.getinstances().trackBeam(nEvts, \
                                         None,
                                         None, None, False)
     
-    # Calculates the transmission of the beamline and calculates the cost
     # This is the function that needs to be modified to calculate the ncc
     # The function itself is in the EnvelopeBayesianOptimisation.py file
-    cost = iEO.compare_histograms(response_funcs, exp_data)
-   
+    cost = iEO.calc_cost(response_funcs, exp_data)
 
-    # Can ignore this. It is to calculate a cost function based on the how
-    # circular the beam is. This is not needed for our optimisation.
-    # sigma_xy_list = iBm.getsigmaxy()
-    # cost = circular_spot_size(sigma_xy_list)
     
     return cost
 
@@ -141,29 +139,6 @@ def main(argv):
     iexBm.extrapolateBeam()
     Prtcl.Particle.cleanParticles()
     
-    
-    # First run the beamline with some random parameters.
-    # This is just to get a visulisation of an unoptimised beam.
-    # This is not needed for the optimisation
-    # Can be ignored
-    # (Note: Might be useful in the future to have it plot the energy deposition histogram 
-    # for a default beamline with no tilts or shifts, which we can compare to the optimised beamline).
-    ibmIOwStrt = bmIO.BeamIO(None, '99-Scratch/PoPLaR-01-pencil-source-nozzle-scapadivergence-start.dat', \
-                             True)
-    BL.BeamLine.getinstances().writeBeamLine(ibmIOwStrt.getdataFILE())
-
-    nEvtGen = BL.BeamLine.getinstances().trackBeam(nEvts, \
-                                        ibmIOwStrt.getdataFILE(),
-                                        None, None, False)
-    # Saves the visualisation of the unoptimised beamline to a file
-    iexBm.plotBeamProgression('99-Scratch/BeamProgressStrt.pdf')
-    
-    #.. ----> End of event loop, wrap up:
-    if Debug:
-        print(" UserAnalysis: calling UsrAnal.UserEnd after event loop:")
-    iEO.UserEnd()
-    if Debug:
-        print(" <---- Done.")
 
 #--------  Got "out of the box" size of beam, now try and optimise:
 
@@ -175,26 +150,43 @@ def main(argv):
     # Checks the beamline looks correct
     print(BL.BeamLine.getinstances())
     
-    # Defines the limits of the search space for the parameters
-    # Will need to be changed to the limits of the tilts and shifts of the PMQs 
-    space = [ \
-              Integer(-0.1, 0.1, name='x1'), \
-              Integer(-0.1, 0.1, name='y1'),
-              Integer(-0.1, 0.1, name='a1'),
-              Integer(-0.1, 0.1, name='b1'),
-              Integer(-0.1, 0.1, name='g1'),
-              Integer(-0.1, 0.1, name='x2'),
-              Integer(-0.1, 0.1, name='y2'),
-              Integer(-0.1, 0.1, name='a2'),
-              Integer(-0.1, 0.1, name='b2'),
-              Integer(-0.1, 0.1, name='g2'),
-             ]
-    
     # Collect some constants before running the optimisation
     experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
-    df_list = [pd.read_csv('RCF_DOSE_DATA/'+f) for f in experiment_files]
-    # combine data list
-    exp_data = pd.concat(df_list, ignore_index=True)
+    exp_data_layers = [pd.read_csv('RCF/'+f).to_numpy() for f in experiment_files]
+    exp_data = np.stack(exp_data_layers, axis=-1) # shape (H, W, 7) 
+    
+    #Temporary fix to experimental data that will force it to be 50 x 50 bins. 
+    # In future the experimental data will be provided in the correct format
+    # This is a workaround to ensure the optimisation works with the current data
+    # This will need to be removed when the experimental data is provided in the correct format
+    
+    exp_data = exp_data[200:250, 50:100, :]  # Trim to 50x50x7 for now
+    
+    print('Shape of experimental data:', exp_data.shape)  # Should print (50, 50, 7)
+    
+    
+    # This is to check the experimental data looks right. 
+    # Uncomment when the right version of exp_data has been added
+    
+    # nrows, ncols, n_layers = exp_data.shape
+    # extent = [0, ncols, 0, nrows]
+
+    # # Plot each layer
+    # for i in range(n_layers):
+    #     values = exp_data[:, :, i]
+    #     plt.figure(figsize=(6, 5))
+    #     plt.imshow(values,
+    #             extent=extent,
+    #             origin='lower', aspect='auto', cmap='afmhot_r')
+    #     plt.colorbar(label='Energy Deposited')
+    #     plt.title(f'2D Histogram of Layer {i+1} ({experiment_files[i]})')
+    #     plt.xlabel('X')
+    #     plt.ylabel('Y')
+    #     plt.grid(True)
+    #     plt.tight_layout()
+    #     plt.savefig(f"99-Scratch/exp_data_{i+1}.png")
+    
+
 
     response_functions = []  # Initialize as list
     for stack in range(7):
@@ -203,18 +195,38 @@ def main(argv):
         with open(f"stack_response_functions/stack_{stack+1}_response_function.pkl", "rb") as file:
             response_func = pickle.load(file)
             response_functions.append(response_func)
+            
+    
+    x = [0.5, 0, 0.1, 0, 0, 0, 0, 0, 0, 0]  # Initial guess for the parameters 
+            
+    test = cost_function(x, nEvts, response_functions, exp_data)
+    
+    return 0
 
-                
+    # Defines the limits of the search space for the parameters
+    # Will need to be changed to the limits of the tilts and shifts of the PMQs 
+    space = [ \
+              Real(-0.1, 0.1, name='x1'), \
+              Real(-0.1, 0.1, name='y1'),
+              Real(-0.1, 0.1, name='a1'),
+              Real(-0.1, 0.1, name='b1'),
+              Real(-0.1, 0.1, name='g1'),
+              Real(-0.1, 0.1, name='x2'),
+              Real(-0.1, 0.1, name='y2'),
+              Real(-0.1, 0.1, name='a2'),
+              Real(-0.1, 0.1, name='b2'),
+              Real(-0.1, 0.1, name='g2'),
+             ]
 
-    # This then runs the optimisation
+        # This then runs the optimisation
     # The function to be minimised is the cost_function
     # The random state is set to None, so it will be random if you run it again
     # The acquisition function is set to EI (Expected Improvement)
     # The verbose is set to True, so it will print out the progress
     res = gp_minimize(lambda x: cost_function(x, nEvts, response_functions, exp_data), \
                       space, \
-                      n_calls=150, \
-                      n_initial_points=10, \
+                      n_calls=2, \
+                      n_initial_points=1, \
                       random_state=None, \
                       acq_func="EI", \
                       verbose=True)
@@ -222,8 +234,6 @@ def main(argv):
     # Save results to CSV
     # I found this useful when there were only 2 parameters as I could plot the results
     # and see the parameter space myself
-    # For us where there will 10 parameters, this is not needed and probably be commented out
-    # or removed
     results = []
     with open("99-Scratch/optimisation_results.csv", "w", newline="") as f:
         writer = csv.writer(f)
@@ -233,7 +243,6 @@ def main(argv):
             x1, y1, a1, b1, g1, x2, y2, a2, b2, g2 = x
             writer.writerow([x1, y1, a1, b1, g1, x2, y2, a2, b2, g2, cost_i])
             results.append([x1, y1, a1, b1, g1, x2, y2, a2, b2, g2, cost_i])
-
 
     # This section is to run the optimisation multiple times with different random starting states
     # This is useful to get a better idea of the parameter space
@@ -252,8 +261,8 @@ def main(argv):
         print('Iteration state number __________ :', iteration_number)
         print('************************************')
         res = gp_minimize(lambda x: cost_function(x, nEvts, response_functions, exp_data), space, \
-                      n_calls=150, \
-                      n_initial_points=20, \
+                      n_calls=10, \
+                      n_initial_points=1, \
                       random_state=state, \
                       acq_func="EI", \
                       verbose=True)
@@ -287,82 +296,15 @@ def main(argv):
     optimal_a2 = best_params['a2']
     optimal_b2 = best_params['b2']
     optimal_g2 = best_params['g2']
-    optimal_ncc= best_params['ncc']
+    optimal_cost = best_params['ncc']
     
 
     # Set optimal cost
-    iEO.setCost(best_trans)
+    iEO.setCost(optimal_cost)
     print("Optimisation complete")
-    print(f"Optimal parameters: \n d1={optimal_drift1*1000}mm \n d2={optimal_drift2*1000}mm \n d3={optimal_drift3*1000}mm")
-    print("Optimal total beamline length:", optimal_total_length*1000)
-    print("Optimal transmission:", best_trans)
-    
+    print(f"Optimal parameters: \n x1={optimal_x1*1000}mm \n y1={optimal_y1*1000}mm \n a1={optimal_a1*1000}mm \n b1={optimal_b1*1000}mm \n g1={optimal_g1*1000}mm \n x2={optimal_x2*1000}mm \n y2={optimal_y2*1000}mm \n a2={optimal_a2*1000}mm \n b2={optimal_b2*1000}mm \n g2={optimal_g2*1000}mm")
+    print("Optimal transmission:", optimal_cost)
 
-    
-#---- Runs the simulation with the optimal parameters:
-
-    # Clears the beamline and particles to make sure there are no old instances
-    BL.BeamLine.cleaninstance()
-    BLE.BeamLineElement.cleaninstances()
-    Prtcl.Particle.cleanAllParticles()
-
-    ibmIOr = iEO.ibmIOr
-    inputfile = ibmIOr.getdataFILE().name
-    ibmIOr.getdataFILE().close()
-    bmIO.BeamIO.cleanBeamIOfiles()
-
-    # Checking there's no beamline elements left
-    print(" Check1:", len(BLE.BeamLineElement.getinstances()))
-    
-    
-    
-    ibmIOr = bmIO.BeamIO(None, inputfile)
-    EndOfFile = ibmIOr.readBeamDataRecord()
-    
-        # Builds the beamline with optimised parameters
-    startBLEparams = iEO.getstartBLEparams()
-    iEO.setBLEparams([
-        [startBLEparams[0][0], 0.04694],
-        [startBLEparams[1][0], 1,0.003,0.0015],
-        [startBLEparams[2][0], 0,0.005,optimal_x1,optimal_y1,optimal_a1,optimal_b1,optimal_g1],
-        [startBLEparams[3][0],  0.04, 332., optimal_x1,optimal_y1,optimal_a1,optimal_b1,optimal_g1],
-        [startBLEparams[4][0], 0,0.005,optimal_x1,optimal_y1,optimal_a1,optimal_b1,optimal_g1],
-        [startBLEparams[5][0], 0.03233],
-        [startBLEparams[6][0], 0,0.005,optimal_x2,optimal_y2,optimal_a2,optimal_b2,optimal_g2],
-        [startBLEparams[7][0], 0.02,318.5, optimal_x2,optimal_y2,optimal_a2,optimal_b2,optimal_g2],
-        [startBLEparams[8][0], 0,0.005,optimal_x2,optimal_y2,optimal_a2,optimal_b2,optimal_g2],
-        [startBLEparams[9][0], 1.76543],
-        [startBLEparams[10][0], 0.01],
-        [startBLEparams[11][0], 0,0.005],
-        [startBLEparams[12][0], 0.02]
-    ])
-
-    iEO.setBeamLine()
-    dataFILE = ibmIOw.getdataFILE()
-    
-    # Checking the new beamline elements have been set
-    print(" Check2:", len(BLE.BeamLineElement.getinstances()))
-    print(BL.BeamLine.getinstances())
-    
-    # This is to write the beamline to a file
-    BL.BeamLine.getinstances().writeBeamLine(dataFILE)
-    # This tracks the beam through the beamline with the optimised parameters
-    # The addition of the dataFILE is to write the output to a file
-    nEvtGen  = BL.BeamLine.getinstances().trackBeam(nEvts,     \
-                                                   dataFILE, \
-                                                   None, None, False)
-
-    # Clears the values before plotting
-    iexBm._CovMtrx = [iexBm._CovMtrx[0]]
-    iexBm._sigmaxy    = []
-    iexBm._emittance  = []
-    iexBm._Twiss      = []
-
-    # This saves the visualisation of the optimised beamline to a file
-    iexBm.extrapolateBeam()
-    iexBm.plotFgression('99-Scratch/BeamProgressEnd.pdf') 
-    iEO.calculate_transmission() #Calculates the transmission of the beamline but does not do anything with it
-    ibmIOw.flushNclosedataFile(dataFILE)
 
 #----  --------  --------  --------  --------  --------  --------  
 
