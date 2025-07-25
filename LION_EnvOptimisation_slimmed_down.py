@@ -76,7 +76,6 @@ class UserAnal:
         
         # Sets default beam line parameters
 
-
         self.getBLEparams().append(["LION:1:Capture:Drift:1", 0.04694])
         self.getBLEparams().append(["LION:1:Capture:Elliptical:1",1,0.003,0.0015])
         self.getBLEparams().append(["LION:1:Capture:Circular:1",  0, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -88,10 +87,6 @@ class UserAnal:
         self.getBLEparams().append(["LION:1:Capture:Circular:4",  0, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0])
         self.getBLEparams().append(["LION:1:Delivery:Drift:1", 1.76543])
         self.getBLEparams().append(["LION:1:Delivery:Circular:1", 0, 0.03])
-
-
-   
-       
 
 
         self.setstartBLEparams(self.getBLEparams())
