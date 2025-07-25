@@ -323,7 +323,7 @@ class UserAnal:
         - response_funcs: list of vectorized functions, one per RCF film/layer
 
         Returns:
-        - counts: 3D array (50, 50, n_layers) of normalized 2D histograms
+        - counts: 3D array (59, 59, n_layers) of normalized 2D histograms
         """
 
         # Energy thresholds (MeV) — min energy to register in each film
@@ -345,9 +345,9 @@ class UserAnal:
             # Filter particles above threshold
             mask = ke > cut
             if not np.any(mask):
-                histograms.append(np.zeros((50, 50)))
-                xedgeses.append(np.linspace(0, 1, 51))  # dummy edges
-                yedgeses.append(np.linspace(0, 1, 51))  # dummy edges
+                histograms.append(np.zeros((59, 59)))
+                xedgeses.append(np.linspace(0, 1, 60))  # dummy edges
+                yedgeses.append(np.linspace(0, 1, 60))  # dummy edges
                 continue
 
             ke_filtered = ke[mask]
@@ -360,7 +360,7 @@ class UserAnal:
             # 2D histogram of deposited energy
             hist, xedges, yedges = np.histogram2d(
                 x_filtered, y_filtered,
-                bins=(50, 50),
+                bins=(59, 59),
                 weights=deposited
             )
 
@@ -370,7 +370,7 @@ class UserAnal:
             xedgeses.append(xedges)
             yedgeses.append(yedges)
 
-        # Stack histograms into a 3D array (50, 50, n_layers)
+        # Stack histograms into a 3D array (59, 59, n_layers)
         counts = np.stack(histograms, axis=-1)
         
         return counts, xedgeses, yedgeses

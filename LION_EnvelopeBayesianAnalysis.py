@@ -151,8 +151,10 @@ def main(argv):
     print(BL.BeamLine.getinstances())
     
     # Collect some constants before running the optimisation
-    experiment_files = ['1RCF3.1.csv', '1RCF6.1.csv', '1RCF8.2.csv', '1RCF9.9.csv', '1RCF11.4.csv', '1RCF12.7.csv', '1RCF13.9.csv']
-    exp_data_layers = [pd.read_csv('RCF/'+f).to_numpy() for f in experiment_files]
+    experiment_files = ['Film_3.1MeV_59x59.csv', 'Film_6.1MeV_59x59.csv', 
+                        'Film_8.2MeV_59x59.csv', 'Film_11.4MeV_59x59.csv', 
+                        'Film_12.7MeV_59x59.csv', 'Film_13.9MeV_59x59.csv']
+    exp_data_layers = [pd.read_csv(f).to_numpy() for f in experiment_files]
     exp_data = np.stack(exp_data_layers, axis=-1) # shape (H, W, 7) 
     
     #Temporary fix to experimental data that will force it to be 50 x 50 bins. 
@@ -197,7 +199,7 @@ def main(argv):
             response_functions.append(response_func)
             
     
-    x = [0.5, 0, 0.1, 0, 0, 0, 0, 0, 0, 0]  # Initial guess for the parameters 
+    x = [0.5, 0, 0.1, 0, 0, 0, 0, 0, 0, 0]  # Attempt to see the output of the cost function without running the full optimisation
             
     test = cost_function(x, nEvts, response_functions, exp_data)
     
